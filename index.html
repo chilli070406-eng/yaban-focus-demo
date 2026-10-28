@@ -23,6 +23,9 @@ body{overflow:hidden}.shell{height:100dvh;min-height:0;overflow:hidden}
 @media(prefers-reduced-motion:reduce){.ig-shield,.ig-obscured{animation:none;will-change:auto}}
 .rank-group-field{margin:8px 0}.rank-group-field+.label{margin:12px 0 8px}
 .calendar-scroll{overflow-x:auto;padding:1px 1px 8px;margin-bottom:15px}.calendar-scroll .calendar{margin-bottom:0}.notice ul{padding-left:16px;margin:6px 0}.notice li+li{margin-top:4px}
+
+/* The launcher supports pointer dragging on mouse and touch screens. */
+.ig-demo-fab{cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}.ig-demo-fab.ig-dragging{cursor:grabbing;box-shadow:0 7px 25px #28354e45}
 </style></head><body><div class="shell"><main class="phone"><div class="status"><span id="statusTime">09:41</span><span class="signals">▰ ▰ ◉</span></div><section class="content" id="content" aria-label="Lectra screen"></section><nav class="nav" id="nav" aria-label="Main navigation" hidden></nav><div class="home"></div><div class="toast" id="toast" role="status"></div></main></div><input id="timetableFile" type="file" accept="image/*" hidden><input id="avatarFile" type="file" accept="image/*" hidden><script>/* Offline timetable layout analysis from OCR word boxes and image pixels. */
 (function(root){
 'use strict';
@@ -337,9 +340,18 @@ window.addEventListener('resize',fitPhone);fitPhone();
   }
   const D={active:false,shield:false,elapsed:0,last:performance.now(),visible:!document.hidden,tab:'home',likes:new Set(),saved:new Set(),following:new Set(),comments:{},panel:null,returnPage:null,originalMode:null,standalone:true};
   const phone=document.querySelector('.phone');
-  const fab=document.createElement('button');fab.className='ig-demo-fab';fab.setAttribute('aria-label','Open Instagram demo — 30-second reminder');fab.innerHTML=svg('camera')+'<span>30s demo</span>';fab.onclick=open;
+  const fab=document.createElement('button');fab.className='ig-demo-fab';fab.setAttribute('aria-label','Open Instagram demo — 30-second reminder');fab.innerHTML=svg('camera')+'<span>30s demo</span>';fab.title='Drag to move · Tap to open Instagram demo';fab.style.touchAction='none';fab.onclick=e=>{if(suppressFabClick){suppressFabClick=false;e.preventDefault();return}open()};
   const host=document.createElement('section');host.className='ig-demo';host.hidden=true;host.setAttribute('aria-label','Instagram demo');
   phone.append(fab,host);
+  let fabDrag=null,fabPosition=null,suppressFabClick=false;
+  function fabBounds(){return {minX:8,minY:44,maxX:Math.max(8,phone.clientWidth-(fab.offsetWidth||57)-8),maxY:Math.max(44,phone.clientHeight-(fab.offsetHeight||65)-20)}}
+  function placeFab(x,y){const b=fabBounds();x=Math.max(b.minX,Math.min(b.maxX,x));y=Math.max(b.minY,Math.min(b.maxY,y));fab.style.left=x+'px';fab.style.top=y+'px';fab.style.right='auto';fab.style.bottom='auto';fabPosition={x:(x-b.minX)/Math.max(1,b.maxX-b.minX),y:(y-b.minY)/Math.max(1,b.maxY-b.minY)}}
+  fab.addEventListener('pointerdown',e=>{if(e.button!==0||e.isPrimary===false)return;const rect=phone.getBoundingClientRect();fabDrag={id:e.pointerId,x:e.clientX,y:e.clientY,left:fab.offsetLeft,top:fab.offsetTop,scale:rect.width/phone.offsetWidth||1,moved:false};suppressFabClick=false;fab.setPointerCapture(e.pointerId)});
+  fab.addEventListener('pointermove',e=>{if(!fabDrag||e.pointerId!==fabDrag.id)return;const dx=(e.clientX-fabDrag.x)/fabDrag.scale,dy=(e.clientY-fabDrag.y)/fabDrag.scale;if(!fabDrag.moved&&Math.hypot(e.clientX-fabDrag.x,e.clientY-fabDrag.y)<6)return;fabDrag.moved=true;fab.classList.add('ig-dragging');placeFab(fabDrag.left+dx,fabDrag.top+dy);e.preventDefault()});
+  function finishFabDrag(e){if(!fabDrag||e.pointerId!==fabDrag.id)return;suppressFabClick=fabDrag.moved&&e.type==='pointerup';fabDrag=null;fab.classList.remove('ig-dragging');if(fab.hasPointerCapture(e.pointerId))fab.releasePointerCapture(e.pointerId);setTimeout(()=>suppressFabClick=false,0)}
+  fab.addEventListener('pointerup',finishFabDrag);fab.addEventListener('pointercancel',finishFabDrag);
+  window.addEventListener('resize',()=>{if(!fabPosition)return;const b=fabBounds();placeFab(b.minX+fabPosition.x*(b.maxX-b.minX),b.minY+fabPosition.y*(b.maxY-b.minY))});
+
   function context(){return S.session?currentCourse():(S.courses.find(c=>c.day===1)||S.courses[0]||seedCourses[0])}
   function classClock(){const course=context();return S.session?S.clock:mins(course.start)*60+Math.min(18*60,Math.floor(duration(course)*20))+Math.floor(D.elapsed)}
   function clockLabel(){const n=classClock();return String(Math.floor(n/3600)%24).padStart(2,'0')+':'+String(Math.floor(n%3600/60)).padStart(2,'0')}
